@@ -1,0 +1,310 @@
+/* main.c ---
+   Levi Roth
+   Partner: Priya Saravanan
+   Contents: code to implement compass and tilt visualizations
+*
+* Filename: main.c
+* Description:
+* Author:
+* Maintainer:
+* Created: Thu Jan 10 11:23:43 2013
+/* Code: */
+
+#include <stm32f30x.h> // Pull in include files for F30x standard drivers
+#include <f3d_uart.h>
+#include <f3d_user_btn.h>
+#include <f3d_lcd_sd.h>
+#include <f3d_i2c.h>
+#include <f3d_accel.h>
+#include <f3d_mag.h>
+#include <f3d_i2c2.c>
+#include <f3d_nunchuk.h>
+#include <stdio.h>
+#include <math.h>
+
+#define TIMER 20000
+
+struct coord {
+  int x;
+  int y;
+};
+
+// Function headers
+void pitch(float * val, float * ans);
+void roll(float * val, float * ans);
+void tilt(float * val, float * ans);
+float compass(float * mag, float * acc);
+void draw_axis(uint16_t col);
+void pt_graph(float * val, uint16_t co);
+void cp_graph(float val, uint16_t col);
+
+// radius for compass circle
+int radius = 30;
+
+// stores values for magnetometer
+float mag[3];
+
+// stores values from accelerometer
+float acc[3];
+
+// provides conversion for tilting purposes
+float tilting[3];
+
+// stores the button from the previous loop
+int prev_pressed = 0;
+// stores the current button 
+int pressed = 0;
+
+// determines which function to be on
+int switch_prog = 0;
+
+// location of the compass pointer
+int mag_x = -1;
+int mag_y = -1;
+
+// slopes to convert to pixels
+float roll_slope = ((ST7735_width-1)/2)/(M_PI);
+float pitch_slope = ((ST7735_height-1)/2)/(M_PI);
+
+// structure to store accelerometer pointer position
+struct coord curr = {0,0};
+
+
+// color scheme
+uint16_t bg_color = BLACK;
+uint16_t tx_color = WHITE;
+
+// nunchuk test struct
+nunchuk_t test;
+nunchuk_t * nunP = &test;
+
+int main(void) {
+
+  f3d_uart_init();
+  delay(100);
+  f3d_i2c1_init();
+  delay(100);
+  f3d_i2c2_init();
+  delay(100);
+  f3d_accel_init();
+  delay(100);
+  f3d_mag_init();
+  delay(100);
+  f3d_nunchuk_init();
+  delay(100);
+  f3d_nunchuk_init2();
+  delay(100);
+  
+  
+  
+
+  setvbuf(stdin, NULL, _IONBF, 0);
+  setvbuf(stdout, NULL, _IONBF, 0);
+  setvbuf(stderr, NULL, _IONBF, 0);
+  
+  
+  // Set up your inits before you go ahead
+  
+  f3d_lcd_init();
+  f3d_user_btn_init();
+  
+  f3d_lcd_fillScreen2(bg_color);
+
+ 
+   draw_axis(WHITE);
+  
+
+  while(1) {
+
+    f3d_nunchuk_read(nunP);
+
+    printf("%c %c %d %d %c %c\n",
+	   nunP->jx, nunP->jy, nunP->ax, nunP->ay, nunP->az, nunP->c, nunP->z);
+	   
+
+    /*
+    // stores values
+    f3d_accel_read(acc);
+    f3d_mag_read(mag);
+    
+    // calculates tilts
+    pitch(acc, tilting);
+    roll(acc, tilting);
+    tilt(acc, tilting);
+    
+    //sets previous button
+    prev_pressed = pressed;
+
+    // checks if button pressed
+    if (user_btn_read() == 1) {
+      pressed = 1;
+    } else {
+      pressed = 0;
+    }
+    
+    // this checks if button was just released and switches program
+    if (pressed == 0 && prev_pressed == 1) {
+      if (switch_prog == 1) {
+	  switch_prog = 0;
+      } else {
+	switch_prog = 1;
+      }
+      // redraws screed for reset
+      f3d_lcd_fillScreen2(bg_color);
+      draw_axis(WHITE);
+   
+    }
+    // calls the specified function
+    if (switch_prog == 1) {
+
+      pt_graph(tilting, CYAN);
+    } else {
+   
+      cp_graph(compass(mag,tilting), RED);
+    }
+    */
+  }
+}
+
+
+// graphs the compass
+void cp_graph(float val, uint16_t col) {	
+  // previous location
+  int prev_x = mag_x;
+  int prev_y = mag_y;
+
+  // provides conversion to pixel coordinates based on the quadrant location
+  if (val < 0) {
+    if (val > M_PI/-2) {
+      mag_x = (int) (0 - fabs(radius*sinf(fabs(val))));
+      mag_y = (int) (0 - fabs(radius*cosf(fabs(val))));
+    } else {
+      mag_x = (int) (0 - fabs(radius*cosf(fabs(val+M_PI/2))));
+      mag_y = (int) (fabs(radius*sinf(fabs(val+M_PI/2))));
+    }
+  } else {
+    if (val < M_PI/2) {
+      mag_x = (int) (fabs(radius*sinf(fabs(val))));
+      mag_y = (int) (0 - fabs(radius*cosf(fabs(val))));
+    } else {
+      mag_x = (int) (fabs(radius*cosf(fabs(val-M_PI/2))));
+      mag_y = (int) (fabs(radius*sinf(fabs(val-M_PI/2))));
+    }
+  }
+
+  // scales to origin at center
+  mag_x += (ST7735_width-1)/2;
+  mag_y = (ST7735_height-1)/2 - mag_y;
+  // undoes previous pointer and redraws
+  f3d_lcd_drawChar(prev_x, prev_y, '*', bg_color, bg_color);
+  draw_axis(WHITE);
+  f3d_lcd_drawChar(mag_x, mag_y,'*', col, bg_color);
+ 
+  // prevents extreme flashing
+  delay(100);
+}
+
+// graphs tilt location
+void pt_graph(float * val, uint16_t col) { 
+  
+  // stores previous points
+  int prev_x = curr.x;
+  int prev_y = curr.y;
+
+
+  // converts to pixels based on trig and quadrant location
+  if (val[2] < 0) {
+    if (val[1] < 0) {
+      curr.x = (ST7735_width-1)/2 + roll_slope * (M_PI + val[1]);
+    } else {
+      curr.x = (ST7735_width-1)/2 - roll_slope * (M_PI - val[1]);
+    }
+  } else {
+    if (val [1] < 0) {
+      curr.x = (ST7735_width-1)/2 - roll_slope * (val[1]);
+    } else {
+      curr.x = (ST7735_width-1)/2 - roll_slope * (val[1]);
+    }
+  }
+
+ if (val[2] < 0) {
+    if (val[0] < 0) {
+      curr.y = (ST7735_height-1)/2 + pitch_slope * (M_PI + val[0]);
+    } else {
+      curr.y = (ST7735_height-1)/2 - pitch_slope * (M_PI - val[0]);
+    }
+  } else {
+    if (val [0] < 0) {
+      curr.y = (ST7735_height-1)/2 - pitch_slope * (val[0]);
+    } else {
+      curr.y = (ST7735_height-1)/2 - pitch_slope * (val[0]);
+    }
+  }
+
+ // checks if need to reprint
+ if (prev_x == curr.x && prev_y == curr.y) {
+
+ } else {
+
+  f3d_lcd_drawChar(prev_x, prev_y, '*', bg_color, bg_color);
+
+  draw_axis(WHITE);
+
+  f3d_lcd_drawChar(curr.x, curr.y,'*', col, bg_color);
+ }
+}
+
+
+// draws axes		   
+void draw_axis(uint16_t col) {
+  uint8_t x, y;
+  y = (ST7735_height-1)/2;
+
+  for(x = 0; x < ST7735_width; x++){
+    f3d_lcd_drawPixel(x, y, col);
+  }
+  x = (ST7735_width-1)/2;
+  for (y = 0; y < ST7735_height; y++) {
+    f3d_lcd_drawPixel(x, y, col);
+  }
+}
+
+//x axis
+ void pitch(float * val, float * ans) {
+  ans[0] = (atan2f(val[0],sqrtf(val[1]*val[1]+val[2]*val[2])));
+}
+
+//y axis
+ void roll(float * val, float * ans) {
+   ans[1] = (atan2f(val[1],sqrtf(val[0]*val[0]+val[2]*val[2])));
+}
+
+//z axis
+ void tilt(float * val, float * ans) {
+   ans[2] = (atan2f(val[2],sqrtf(val[1]*val[1]+val[0]*val[0])));
+  
+}
+
+// grabs compass data based on tilt and mag reading
+float compass(float * mag, float * tilting) {
+  
+  return (atan2f(mag[0]*sin(tilting[0]) + 
+		 mag[1]*cos(tilting[1]) - 
+		 mag[2]*sin(tilting[1])*cos(tilting[0])
+		 ,
+		 mag[0]*cos(tilting[0]) + 
+		 mag[2]*sin(tilting[0])));
+  
+  // return atan2f(mag[1], mag[0]);
+
+}
+
+#ifdef USE_FULL_ASSERT
+void assert_failed(uint8_t* file, uint32_t line) {
+/* Infinite loop */
+/* Use GDB to find out why we're here */
+  while (1);
+}
+#endif
+
+/* main.c ends here */
