@@ -1,0 +1,14 @@
+
+
+1) 
+
+2) 
+
+3) 
+
+4)
+
+5) 3.5ms in second function 
+10.17ms in first function
+
+Difficulties: 

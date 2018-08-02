@@ -1,0 +1,17 @@
+//Lab 01
+//Ice breaker assignment
+
+#include <stdio.h>
+#include <unistd.h>
+
+
+int main() {
+
+  printf("ALERT! Your bank accounts have been hacked. Please send your SSN, bank account information and address to youreabadboss@andstupid.com. If you really ave been hacked, Hello World will print periodically after this. Every time Hello World prints, more bank account information is stolen from you.\n");
+   
+    while(1) {
+    printf("Hello World\n");
+    sleep(3);
+	}
+    return 0;
+}
