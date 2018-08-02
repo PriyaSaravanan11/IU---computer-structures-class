@@ -1,0 +1,22 @@
+Questions: 
+
+1) the CS pin is chosen by the master and is communicated with by 
+lowering the appropriate SS line and then a single word is transferred 
+serially over the signal MOSI and at the same time
+accepts a single byte from the slave over MOSI as well
+
+2) so that no communication happens 
+GYRO_CS_HIGH or GYRO_CS_LOW (are set to high and low)
+
+3) The way the board is wired helps with hooking up multiple peripherals on one SPI bus.
+The master will then use the appropriate CS line for communication. 
+
+4) Baud: 8
+	Clock: 3MHz
+5) To make sure that the transfer of bytes occur smoothly and to be in sync
+
+Difficulties: 
+
+Understanding how to develop the application part was difficult and some of the
+instructions in the beginning were hard to follow. Initializations are somewhat clearer now and using the debugger
+was a little confusing initially. 
